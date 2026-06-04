@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-frontend
+  namespace: veritas-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: veritas-frontend
+  template:
+    metadata:
+      labels:
+        app: veritas-frontend
+    spec:
+      containers:
+      - name: veritas-frontend
+        image: veritas/frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: veritas-frontend-svc
+  namespace: veritas-prod
+spec:
+  type: ClusterIP
+  selector:
+    app: veritas-frontend
+  ports:
+  - port: 80
+    targetPort: 80

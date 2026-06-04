@@ -1,0 +1,23 @@
+# Settings template — copy to settings.yaml and tune.
+ollama:
+  url: "http://localhost:11434"
+  model: "llama3"
+  timeout_s: 30
+  retries: 3
+
+redpanda:
+  bootstrap: "localhost:9092"
+  topic_ingest: "posts.ingest"
+  topic_dlq: "posts.dlq"
+  group_id: "veritas-consumer"
+
+chroma:
+  path: "./chroma_db"
+  collection: "facts"
+  embedding_model: "all-MiniLM-L6-v2"
+  top_k: 5
+
+postgres:
+  dsn: "postgresql+psycopg://veritas:veritas@localhost:5432/veritas"
+
+risk_weights: [0.40, 0.25, 0.25, 0.10]   # llm_conf, similarity, contradiction, engagement

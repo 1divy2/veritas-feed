@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-workers
+  namespace: veritas-prod
+  labels:
+    app: veritas-workers
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: veritas-workers
+  template:
+    metadata:
+      labels:
+        app: veritas-workers
+    spec:
+      containers:
+      - name: veritas-worker-node
+        image: veritas/backend:latest
+        command: ["python", "-m", "backend.workers.scheduler"]
+        envFrom:
+        - secretRef:
+            name: veritas-secrets
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
