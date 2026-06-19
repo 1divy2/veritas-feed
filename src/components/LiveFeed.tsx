@@ -11,9 +11,10 @@ type Item = {
   conf: number;
   latency: number;
   evidence: string;
+  isNew: boolean;
 };
 
-const CORPUS: Omit<Item, "id" | "t" | "verdict" | "risk" | "conf" | "latency">[] = [
+const CORPUS: Omit<Item, "id" | "t" | "verdict" | "risk" | "conf" | "latency" | "isNew">[] = [
   { topic: "health", text: "Drinking lemon water at 4am cures stage IV cancers within 11 days.", evidence: "WHO/NIH oncology guidelines — no clinical support." },
   { topic: "climate", text: "Global mean temperature rose 1.45°C above pre-industrial baseline in 2024.", evidence: "WMO State of the Climate 2024 report." },
   { topic: "ai", text: "GPT-5 is fully sentient and has been hidden from the public since March.", evidence: "No peer-reviewed or vendor disclosure supports this claim." },
@@ -44,12 +45,12 @@ const ts = () => {
   return d.toISOString().split("T")[1]?.replace("Z", "") ?? "00:00:00";
 };
 
-const verdictColor: Record<Verdict, string> = {
-  VERIFIED: "text-[color:var(--color-ok)] border-[color:var(--color-ok)]",
-  MISLEADING: "text-[color:var(--color-warn)] border-[color:var(--color-warn)]",
-  FALSE: "text-[color:var(--color-crit)] border-[color:var(--color-crit)]",
-  PARTIAL: "text-[color:var(--color-warn)] border-[color:var(--color-warn)]",
-  UNSUPPORTED: "text-muted-foreground border-border",
+const verdictStyles: Record<Verdict, { classes: string; glow: string }> = {
+  VERIFIED:   { classes: "text-[color:var(--color-ok)] border-[color:var(--color-ok)]",    glow: "" },
+  MISLEADING: { classes: "text-[color:var(--color-warn)] border-[color:var(--color-warn)]", glow: "" },
+  FALSE:      { classes: "text-[color:var(--color-crit)] border-[color:var(--color-crit)]", glow: "glow-crit" },
+  PARTIAL:    { classes: "text-[color:var(--color-warn)] border-[color:var(--color-warn)]", glow: "" },
+  UNSUPPORTED:{ classes: "text-muted-foreground border-border", glow: "" },
 };
 
 export function LiveFeed() {
@@ -75,8 +76,9 @@ export function LiveFeed() {
             risk,
             conf,
             latency: 180 + Math.floor(Math.random() * 420),
+            isNew: true,
           },
-          ...prev,
+          ...prev.map(item => ({ ...item, isNew: false })),
         ].slice(0, 14),
       );
     }, 1400);
@@ -84,53 +86,66 @@ export function LiveFeed() {
   }, [paused]);
 
   return (
-    <div className="border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2 font-mono text-xs uppercase tracking-widest">
+    <div className="border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest">
         <div className="flex items-center gap-3">
-          <span className="inline-block size-2 rounded-full bg-[color:var(--color-ok)] blink" />
-          <span>live // redpanda.topic = posts.ingest</span>
+          <span className="inline-block size-2 rounded-full bg-[color:var(--color-ok)] pulse-live" />
+          <span className="text-muted-foreground">live // redpanda.topic = posts.ingest</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-muted-foreground">throughput ~ 24 msg/s</span>
+          <span className="text-muted-foreground">~ 24 msg/s</span>
           <button
             onClick={() => setPaused((p) => !p)}
-            className="border border-border px-2 py-0.5 hover:bg-accent hover:text-accent-foreground"
+            className="border border-border px-2 py-0.5 hover:bg-secondary transition-colors"
           >
             {paused ? "resume" : "pause"}
           </button>
         </div>
       </div>
-      <div className="divide-y divide-border font-mono text-[13px]">
+
+      {/* Feed items */}
+      <div className="divide-y divide-border font-mono text-[12px] max-h-[520px] overflow-y-auto">
         {items.length === 0 && (
           <div className="px-4 py-10 text-center text-muted-foreground">
             booting consumer<span className="blink">_</span>
           </div>
         )}
-        {items.map((it) => (
-          <div key={it.id} className="feed-in grid grid-cols-12 gap-3 px-4 py-3">
-            <div className="col-span-2 text-muted-foreground">
-              <div>{it.t}</div>
-              <div className="text-[10px] uppercase">{it.topic}</div>
-            </div>
-            <div className="col-span-7">
-              <div className="text-foreground">{it.text}</div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                ↳ evidence: {it.evidence}
+        {items.map((it) => {
+          const vs = verdictStyles[it.verdict];
+          return (
+            <div
+              key={it.id}
+              className={`grid grid-cols-12 gap-3 px-4 py-3 transition-colors duration-150 hover:bg-secondary/30 ${it.isNew ? "feed-in" : ""} ${it.isNew && it.verdict === "FALSE" ? vs.glow : ""}`}
+            >
+              {/* Timestamp + topic */}
+              <div className="col-span-2 text-muted-foreground">
+                <div>{it.t}</div>
+                <div className="text-[10px] uppercase">{it.topic}</div>
+              </div>
+
+              {/* Claim text + evidence */}
+              <div className="col-span-7">
+                <div className="text-foreground">{it.text}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  {">"} evidence: {it.evidence}
+                </div>
+              </div>
+
+              {/* Verdict + scores */}
+              <div className="col-span-3 flex flex-col items-end gap-1.5">
+                <span className={`border px-2 py-0.5 text-[10px] uppercase tracking-widest ${vs.classes}`}>
+                  {it.verdict}
+                </span>
+                <div className="text-[10px] text-muted-foreground text-right">
+                  risk <span className="text-foreground">{it.risk}</span> · conf{" "}
+                  <span className="text-foreground">{it.conf.toFixed(2)}</span>
+                </div>
+                <div className="text-[9px] text-muted-foreground/60">{it.latency}ms</div>
               </div>
             </div>
-            <div className="col-span-3 flex flex-col items-end gap-1">
-              <span
-                className={`border px-2 py-0.5 text-[10px] uppercase tracking-widest ${verdictColor[it.verdict]}`}
-              >
-                {it.verdict}
-              </span>
-              <div className="text-[10px] text-muted-foreground">
-                risk <span className="text-foreground">{it.risk}</span> · conf{" "}
-                <span className="text-foreground">{it.conf.toFixed(2)}</span> · {it.latency}ms
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

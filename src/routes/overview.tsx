@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { LiveFeed } from "@/components/LiveFeed";
 import { Pipeline } from "@/components/Pipeline";
 import { Metrics } from "@/components/Metrics";
@@ -42,6 +43,61 @@ const SERVICES = [
   { code: "10", name: "tests/", desc: "Unit · integration · e2e · bus · api (target >80% coverage).", status: "scaffold" },
 ];
 
+const TERMINAL_LINES = [
+  { time: "00:00.000", type: "input", text: "POST /api/v1/claims { source: \"twitter\", text: \"Study shows 5G towers cause...\" }" },
+  { time: "00:00.034", type: "info", text: "→ ingested · id=clm_7f3a · topic=health" },
+  { time: "00:00.118", type: "info", text: "→ embedding · 384-dim · model=all-MiniLM-L6-v2" },
+  { time: "00:00.203", type: "info", text: "→ evidence.retrieval · top-k=5 · candidates=12" },
+  { time: "00:00.341", type: "info", text: "→ hybrid.score · cos=0.82 · tfidf=0.74 · contra=0.11" },
+  { time: "00:00.512", type: "info", text: "→ verification.engine · model=llama3 · latency=171ms" },
+  { time: "00:00.512", type: "result", text: "│ verdict: FALSE          confidence: 0.94" },
+  { time: "00:00.512", type: "result", text: "│ risk_score: 82/100     category: health_misinfo" },
+  { time: "00:00.513", type: "ok", text: "→ persisted · trace=complete · audit=7 nodes" },
+];
+
+function LiveTerminal() {
+  const [visible, setVisible] = useState(0);
+  useEffect(() => {
+    if (visible >= TERMINAL_LINES.length) {
+      const timeout = setTimeout(() => setVisible(0), 2400);
+      return () => clearTimeout(timeout);
+    }
+    const delay = TERMINAL_LINES[visible].type === "result" ? 180 : 280;
+    const timeout = setTimeout(() => setVisible(v => v + 1), delay);
+    return () => clearTimeout(timeout);
+  }, [visible]);
+
+  return (
+    <div className="border border-border bg-background/80 glass font-mono text-[11px] leading-relaxed overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+        <span className="inline-block size-1.5 rounded-full bg-[color:var(--color-ok)] pulse-live" />
+        pipeline.live · verification trace
+      </div>
+      <div className="p-3 space-y-0.5 min-h-[200px]">
+        {TERMINAL_LINES.slice(0, visible).map((line, i) => (
+          <div key={i} className="flex gap-2 feed-in">
+            <span className="text-muted-foreground shrink-0 w-[72px]">{line.time}</span>
+            <span className={
+              line.type === "ok" ? "text-[color:var(--color-ok)]" :
+              line.type === "result" ? "text-foreground font-medium" :
+              line.type === "input" ? "text-[color:var(--color-info)]" :
+              "text-muted-foreground"
+            }>
+              {line.text}
+            </span>
+          </div>
+        ))}
+        {visible < TERMINAL_LINES.length && (
+          <div className="flex gap-2">
+            <span className="text-muted-foreground shrink-0 w-[72px]">...</span>
+            <span className="text-accent blink">▍</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   return (
     <div className="min-h-screen text-foreground">
@@ -57,9 +113,9 @@ function Index() {
             <AppearanceToggle />
             <Link
               to="/login"
-              className="border border-border px-3 py-1 text-[11px] uppercase tracking-widest hover:bg-foreground hover:text-background"
+              className="border border-border px-3 py-1 text-[11px] uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
             >
-              open workspace ↗
+              open workspace
             </Link>
           </div>
         </div>
@@ -68,35 +124,37 @@ function Index() {
           <div className="ticker-track flex gap-12 whitespace-nowrap py-1 text-[11px] uppercase tracking-widest">
             {Array.from({ length: 2 }).map((_, k) => (
               <div key={k} className="flex shrink-0 gap-12 px-6">
-                <span>● ingest 1,284/m</span>
-                <span>● verify.p95 612ms</span>
-                <span>● risk.crit 6%</span>
-                <span>● topic.health 32%</span>
-                <span>● dlq 0</span>
-                <span>● evidence.facts 142</span>
-                <span>● engine local</span>
-                <span>● redpanda 3 brokers</span>
-                <span>● postgres 14</span>
-                <span>● prom · grafana</span>
+                <span>ingest 1,284/m</span>
+                <span>verify.p95 612ms</span>
+                <span>risk.crit 6%</span>
+                <span>topic.health 32%</span>
+                <span>dlq 0</span>
+                <span>evidence.facts 142</span>
+                <span>engine local</span>
+                <span>redpanda 3 brokers</span>
+                <span>postgres 14</span>
+                <span>prom · grafana</span>
               </div>
             ))}
           </div>
         </div>
       </header>
 
-      {/* HERO */}
+      {/* HERO — 7/5 asymmetric split */}
       <section className="relative border-b border-border">
-        <div className="absolute inset-0 noise pointer-events-none opacity-30" />
+        <div className="absolute inset-0 noise pointer-events-none opacity-20" />
         <div className="mx-auto grid max-w-[1400px] grid-cols-12 gap-6 px-6 py-16 md:py-24">
-          <div className="col-span-12 md:col-span-8">
+          <div className="col-span-12 md:col-span-7">
             <div className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
               dossier · case file <span className="text-foreground">#2026-06-02</span>
             </div>
-            <h1 className="mt-4 text-4xl font-medium leading-[1.05] tracking-tight md:text-6xl lg:text-7xl slide-up">
-              We don't moderate the internet.<br />
-              <span className="bg-foreground px-2 text-background glow-accent">We instrument it.</span>
+            <h1 className="mt-4 font-display text-5xl font-normal leading-[1.05] tracking-tight md:text-6xl lg:text-7xl slide-up">
+              We don't moderate the internet.
             </h1>
-            <p className="mt-6 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+            <h1 className="mt-1 font-display text-5xl font-normal leading-[1.05] tracking-tight md:text-6xl lg:text-7xl slide-up" style={{ animationDelay: "0.06s" }}>
+              We <span className="bg-foreground px-2 text-background glow-accent not-italic">instrument</span> it.
+            </h1>
+            <p className="mt-6 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
               An evidence investigation platform that runs on a laptop. Stream claims through{" "}
               a Kafka-compatible bus, retrieve verified records from a local evidence store,
               adjudicate with a local verification engine, score risk on a 0–100 composite,
@@ -105,33 +163,21 @@ function Index() {
             <div className="mt-8 flex flex-wrap gap-3 text-[11px] uppercase tracking-widest">
               <Link
                 to="/login"
-                className="border border-foreground bg-foreground px-4 py-2 text-background hover:bg-accent hover:text-accent-foreground hover:border-accent"
+                className="border border-foreground bg-foreground px-4 py-2 text-background hover:bg-accent hover:text-accent-foreground hover:border-accent transition-colors"
               >
-                ▸ open investigation workspace
+                open investigation workspace
               </Link>
-              <a href="#feed" className="border border-border px-4 py-2 hover:bg-accent hover:text-accent-foreground hover:border-accent">
+              <a href="#feed" className="border border-border px-4 py-2 hover:bg-secondary transition-colors">
                 inspect live feed
               </a>
-              <a href="#run" className="border border-border px-4 py-2 hover:bg-accent hover:text-accent-foreground hover:border-accent">
-                run locally ↗
+              <a href="#run" className="border border-border px-4 py-2 hover:bg-secondary transition-colors">
+                run locally
               </a>
             </div>
           </div>
 
-          <div className="col-span-12 md:col-span-4">
-            <div className="border border-border bg-card p-5 glass hover-lift">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                operating constraints
-              </div>
-              <ul className="mt-3 space-y-2 text-[12px] stagger-in">
-                <li className="flex justify-between border-b border-border pb-2"><span>compute</span><span>local · cpu+gpu</span></li>
-                <li className="flex justify-between border-b border-border pb-2"><span>cost / month</span><span>$0.00</span></li>
-                <li className="flex justify-between border-b border-border pb-2"><span>external apis</span><span>none</span></li>
-                <li className="flex justify-between border-b border-border pb-2"><span>throughput target</span><span>1k+ msg/min</span></li>
-                <li className="flex justify-between border-b border-border pb-2"><span>explainability</span><span>per-claim trace</span></li>
-                <li className="flex justify-between"><span>license</span><span>MIT</span></li>
-              </ul>
-            </div>
+          <div className="col-span-12 md:col-span-5 flex flex-col gap-4">
+            <LiveTerminal />
           </div>
         </div>
       </section>
@@ -181,7 +227,7 @@ function Index() {
           <SectionHeader code="05" kicker="repository" title="Ten services. Each one isolated, each one boring on purpose." />
           <div className="mt-8 grid grid-cols-1 gap-px bg-border md:grid-cols-2">
             {SERVICES.map((s) => (
-              <div key={s.code} className="bg-card p-5 hover-lift">
+              <div key={s.code} className="bg-card p-5 hover-lift cursor-default">
                 <div className="flex items-baseline justify-between">
                   <div className="flex items-baseline gap-3">
                     <span className="text-[10px] tracking-widest text-muted-foreground">{s.code}</span>
@@ -224,7 +270,7 @@ function Index() {
         <div className="mx-auto grid max-w-[1400px] grid-cols-12 gap-6 px-6 py-16">
           <div className="col-span-12 md:col-span-5">
             <div className="text-[10px] uppercase tracking-widest opacity-60">07 · runbook</div>
-            <h2 className="mt-3 text-3xl font-medium leading-tight md:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-normal leading-tight md:text-5xl">
               Three commands. <span className="text-accent">No accounts.</span>
             </h2>
             <p className="mt-4 max-w-md text-[12px] opacity-70">
@@ -246,10 +292,10 @@ python backend/scripts/seed_knowledge_base.py
 python backend/producer/producer.py --rate 10
 
 # inspect
-# › api         http://localhost:8000/docs
-# › grafana     http://localhost:3000
-# › redpanda    http://localhost:8080
-# › prometheus  http://localhost:9090`}
+# > api         http://localhost:8000/docs
+# > grafana     http://localhost:3000
+# > redpanda    http://localhost:8080
+# > prometheus  http://localhost:9090`}
             </pre>
           </div>
         </div>
@@ -279,7 +325,7 @@ function SectionHeader({
         <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
           {code} · {kicker}
         </div>
-        <h2 className="mt-2 text-2xl font-medium leading-tight md:text-4xl">{title}</h2>
+        <h2 className="mt-2 font-display text-2xl font-normal leading-tight md:text-4xl">{title}</h2>
       </div>
       {note && (
         <div className="text-[11px] uppercase tracking-widest text-muted-foreground">{note}</div>

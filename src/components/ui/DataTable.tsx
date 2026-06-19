@@ -31,16 +31,16 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="w-full border border-border bg-card glass hover-glow">
+    <div className="w-full border border-border bg-card glass overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-[11px] leading-tight">
-          <thead className="bg-secondary/50 uppercase tracking-widest text-muted-foreground gradient-border">
+          <thead className="bg-secondary/80 backdrop-blur-sm uppercase tracking-widest text-muted-foreground sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border">
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header, i) => (
                   <th
                     key={header.id}
-                    className="whitespace-nowrap px-3 py-2 font-medium"
+                    className={`whitespace-nowrap px-3 py-2 font-medium ${i === 0 ? "sticky left-0 bg-secondary/80 backdrop-blur-sm" : ""}`}
                     style={{ width: header.getSize() !== 150 ? header.getSize() : "auto" }}
                   >
                     {header.isPlaceholder ? null : (
@@ -67,15 +67,15 @@ export function DataTable<TData, TValue>({
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-border stagger-in">
+          <tbody className="divide-y divide-border">
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row, rowIdx) => (
                 <tr
                   key={row.id}
-                  className="row-hover"
+                  className={`row-hover ${rowIdx % 2 === 1 ? "bg-secondary/20" : ""}`}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3 py-1.5 whitespace-nowrap">
+                  {row.getVisibleCells().map((cell, i) => (
+                    <td key={cell.id} className={`px-3 py-1.5 whitespace-nowrap ${i === 0 ? "sticky left-0 bg-inherit" : ""}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

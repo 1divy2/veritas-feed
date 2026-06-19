@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type Appearance = "light" | "dark" | "contrast";
+export type Appearance = "light" | "dark" | "contrast" | "darkroom";
 
 type ThemeContextType = {
   appearance: Appearance;
@@ -14,14 +14,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("veritas_appearance") as Appearance;
-    if (saved && ["light", "dark", "contrast"].includes(saved)) {
+    if (saved && ["light", "dark", "contrast", "darkroom"].includes(saved)) {
       setAppearance(saved);
     }
   }, []);
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("light", "dark", "contrast");
+    root.classList.remove("light", "dark", "contrast", "darkroom");
     
     if (appearance !== "light") {
       root.classList.add(appearance);

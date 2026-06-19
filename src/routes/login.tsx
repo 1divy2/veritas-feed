@@ -13,40 +13,84 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-function LiveMetrics() {
-  const [m, setM] = useState({ tput: 1284, p95: 612, active: 47, processed: 184_201 });
+const PIPELINE_STEPS = [
+  { label: "ingest", status: "ok", detail: "1,284 msg/min" },
+  { label: "retrieve", status: "ok", detail: "top-k=5 · 12ms" },
+  { label: "verify", status: "ok", detail: "llama3 · 171ms" },
+  { label: "analyze", status: "ok", detail: "risk=42 · MED" },
+  { label: "score", status: "ok", detail: "conf=0.87" },
+  { label: "persist", status: "ok", detail: "postgres · 8ms" },
+];
+
+function LiveTerminal() {
+  const [step, setStep] = useState(0);
+  const [throughput, setThroughput] = useState(1284);
+
   useEffect(() => {
     const id = setInterval(() => {
-      setM((p) => ({
-        tput: Math.max(900, p.tput + Math.floor((Math.random() - 0.5) * 80)),
-        p95: Math.max(220, p.p95 + Math.floor((Math.random() - 0.5) * 40)),
-        active: Math.max(10, p.active + Math.floor((Math.random() - 0.5) * 4)),
-        processed: p.processed + Math.floor(Math.random() * 8),
-      }));
+      setThroughput(t => Math.max(900, t + Math.floor((Math.random() - 0.5) * 80)));
     }, 1100);
     return () => clearInterval(id);
   }, []);
-  const rows: [string, string][] = [
-    ["throughput.msg_min", m.tput.toLocaleString()],
-    ["latency.p95_ms", String(m.p95)],
-    ["investigations.active", String(m.active)],
-    ["cases.processed_24h", m.processed.toLocaleString()],
-  ];
+
+  useEffect(() => {
+    if (step >= PIPELINE_STEPS.length) {
+      const timeout = setTimeout(() => setStep(0), 2000);
+      return () => clearTimeout(timeout);
+    }
+    const timeout = setTimeout(() => setStep(s => s + 1), 320);
+    return () => clearTimeout(timeout);
+  }, [step]);
+
   return (
-    <div className="border border-border bg-card/40 glass hover-glow">
-      <div className="border-b border-border px-3 py-2 text-[10px] uppercase tracking-widest text-muted-foreground gradient-border">
-        <span className="pulse-live inline-block size-1.5 rounded-full bg-[color:var(--color-ok)] mr-2" />live_signal · workspace.uptime 99.97%
+    <div className="border border-border bg-background/60 glass font-mono text-[11px] leading-relaxed">
+      <div className="flex items-center justify-between border-b border-border px-3 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="inline-block size-1.5 rounded-full bg-[color:var(--color-ok)] pulse-live" />
+          pipeline.status
+        </div>
+        <span>{throughput.toLocaleString()} msg/min</span>
       </div>
-      <div className="divide-y divide-border stagger-in">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex items-baseline justify-between px-3 py-2 text-[12px]">
-            <span className="text-muted-foreground">{k}</span>
-            <span className="text-foreground">{v}</span>
+      <div className="p-3 space-y-1">
+        {PIPELINE_STEPS.slice(0, step).map((s, i) => (
+          <div key={i} className="flex items-center justify-between feed-in">
+            <div className="flex items-center gap-2">
+              <span className="text-[color:var(--color-ok)]">+</span>
+              <span>{s.label}</span>
+            </div>
+            <span className="text-muted-foreground">{s.detail}</span>
           </div>
         ))}
+        {step < PIPELINE_STEPS.length && (
+          <div className="flex items-center gap-2">
+            <span className="text-accent blink">▍</span>
+            <span className="text-muted-foreground">processing...</span>
+          </div>
+        )}
+        {step >= PIPELINE_STEPS.length && (
+          <div className="mt-2 border-t border-border pt-2 text-[color:var(--color-ok)] feed-in">
+            pipeline complete · all stages nominal
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+function CountUp({ target, duration = 1200 }: { target: number; duration?: number }) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.floor(eased * target));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target, duration]);
+  return <span>{value.toLocaleString()}</span>;
 }
 
 function LoginPage() {
@@ -96,7 +140,7 @@ function LoginPage() {
             workspace · v0.2.0
           </div>
           <div>
-            <h1 className="text-[44px] font-medium leading-[1.05] tracking-tight md:text-[56px] slide-up">
+            <h1 className="font-display text-[44px] font-normal leading-[1.05] tracking-tight md:text-[56px] slide-up">
               Evidence over<br />speculation<span className="text-accent glow-accent">.</span>
             </h1>
             <p className="mt-5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
@@ -105,7 +149,7 @@ function LoginPage() {
               verdict ships with its citations, contradictions, and confidence trace.
             </p>
             <div className="mt-8 max-w-md">
-              <LiveMetrics />
+              <LiveTerminal />
             </div>
           </div>
           <div className="mt-10 grid grid-cols-3 gap-px border border-border bg-border text-[10px] uppercase tracking-widest">
@@ -130,9 +174,9 @@ function LoginPage() {
               <button
                 type="button"
                 onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-                className="text-foreground hover:text-accent"
+                className="text-foreground hover:text-accent transition-colors"
               >
-                {mode === "signin" ? "→ create account" : "← sign in"}
+                {mode === "signin" ? "-> create account" : "<- sign in"}
               </button>
             </div>
 
@@ -145,7 +189,7 @@ function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               placeholder="analyst@veritas.local"
-              className="mt-1 w-full border border-border bg-background px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+              className="mt-1 w-full border border-border bg-background px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
             />
 
             <label className="mt-4 block text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -158,12 +202,12 @@ function LoginPage() {
                 onChange={(e) => setPw(e.target.value)}
                 autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 placeholder="••••••••"
-                className="w-full border border-border bg-background px-3 py-2 pr-14 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full border border-border bg-background px-3 py-2 pr-14 text-[13px] focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShow((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest hover:bg-secondary"
+                className="absolute right-2 top-1/2 -translate-y-1/2 border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest hover:bg-secondary transition-colors"
               >
                 {show ? "hide" : "show"}
               </button>
@@ -178,9 +222,9 @@ function LoginPage() {
             <button
               type="submit"
               disabled={busy}
-              className="mt-5 w-full border border-foreground bg-foreground px-3 py-2 text-[12px] uppercase tracking-widest text-background hover:bg-accent hover:text-accent-foreground hover:border-accent disabled:opacity-60"
+              className="mt-5 w-full border border-foreground bg-foreground px-3 py-2 text-[12px] uppercase tracking-widest text-background hover:bg-accent hover:text-accent-foreground hover:border-accent disabled:opacity-60 transition-colors"
             >
-              {busy ? "authenticating…" : mode === "signin" ? "▸ sign in" : "▸ create account"}
+              {busy ? "authenticating..." : mode === "signin" ? "> sign in" : "> create account"}
             </button>
 
             <div className="my-4 flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground">

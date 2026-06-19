@@ -1,22 +1,63 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HistoricalTimeline } from "@/components/ui/HistoricalTimeline";
 import { ApprovalBanner } from "@/components/ui/ApprovalBanner";
 import { DiscussionThread } from "@/components/ui/DiscussionThread";
 import { useState, useEffect } from "react";
 import { getDoc } from "firebase/firestore";
 import { getCaseRef, CaseData } from "@/lib/db";
 import { PageLoader } from "@/components/ui/PageLoader";
-import { ActivityTimelineChart, ProgressMeter, EvidenceNetwork } from "@/components/visualizations";
+import { ProgressMeter, EvidenceNetwork } from "@/components/visualizations";
+import { ActivityTimelineChart } from "@/components/visualizations";
+import { ConfidenceGauge } from "@/components/visualizations/ConfidenceGauge";
 
 export const Route = createFileRoute("/_authenticated/workspace/investigations/$id")({
   component: InvestigationDetailPage,
 });
+
+const TIMELINE_EVENTS = [
+  { time: "14 months ago", label: "First sighting", detail: "Initial claim detected on X/Twitter", severity: "info" as const },
+  { time: "11 months ago", label: "Narrative cluster formed", detail: "Linked to 3 related claims across Reddit", severity: "info" as const },
+  { time: "6 months ago", label: "Escalation trigger", detail: "Bot network amplification detected", severity: "warn" as const },
+  { time: "3 months ago", label: "Peak velocity", detail: "1,200+ mentions in 48 hours", severity: "crit" as const },
+  { time: "2 weeks ago", label: "Analyst assigned", detail: "@sarah opened investigation", severity: "info" as const },
+  { time: "2 hours ago", label: "Network confirmed synthetic", detail: "400+ coordinated nodes identified", severity: "ok" as const },
+];
+
+const RELATED_NARRATIVES = [
+  { title: "5G Infrastructure Interference", match: 88, risk: "high" },
+  { title: "Local Election Disruption", match: 45, risk: "medium" },
+  { title: "Public Health Coverup", match: 32, risk: "low" },
+];
+
+function TimelineNode({ event, isLast }: { event: typeof TIMELINE_EVENTS[0]; isLast: boolean }) {
+  const dotColor = {
+    info: "bg-[color:var(--color-info)]",
+    warn: "bg-[color:var(--color-warn)]",
+    crit: "bg-[color:var(--color-crit)]",
+    ok: "bg-[color:var(--color-ok)]",
+  }[event.severity];
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center">
+        <div className={`size-2.5 rounded-full ${dotColor} shrink-0`} />
+        {!isLast && <div className="w-px flex-1 bg-border min-h-[24px]" />}
+      </div>
+      <div className={`pb-4 ${isLast ? "" : ""}`}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{event.time}</div>
+        <div className="text-[12px] font-medium text-foreground mt-0.5">{event.label}</div>
+        <div className="text-[11px] text-muted-foreground mt-0.5">{event.detail}</div>
+      </div>
+    </div>
+  );
+}
 
 function InvestigationDetailPage() {
   const { id } = Route.useParams();
   const [approvalStatus, setApprovalStatus] = useState<"Draft" | "Pending Review" | "Approved" | "Rejected" | "Published">("Pending Review");
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
 
   useEffect(() => {
     async function fetchCase() {
@@ -24,7 +65,6 @@ function InvestigationDetailPage() {
         const docSnap = await getDoc(getCaseRef(id));
         if (docSnap.exists()) {
           setCaseData(docSnap.data());
-          // Update approval status based on case status if applicable
           if (docSnap.data().status === "Closed") setApprovalStatus("Approved");
         }
       } catch (e) {
@@ -47,67 +87,78 @@ function InvestigationDetailPage() {
   if (!caseData) return <div className="p-4">Case not found</div>;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden p-4 bg-secondary/5 slide-up">
-      <ApprovalBanner 
-        status={approvalStatus} 
-        onAction={(action) => {
-          if (action === "approve") setApprovalStatus("Approved");
-          if (action === "reject") setApprovalStatus("Rejected");
-        }} 
-      />
-      
-      <div className="flex items-center justify-between border-b border-border pb-4 mb-4 shrink-0">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-medium">{id}</h1>
-          <span className={`px-2 py-0.5 border text-[10px] uppercase tracking-widest rounded-sm ${
-            caseData.priority === 'Critical' ? 'border-[color:var(--color-crit)] text-[color:var(--color-crit)]' :
-            caseData.priority === 'High' ? 'border-[color:var(--color-warn)] text-[color:var(--color-warn)]' :
-            'border-border text-muted-foreground'
-          }`}>{caseData.priority} Priority</span>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Action bar */}
+      <div className="shrink-0 border-b border-border px-4 py-2">
+        <ApprovalBanner
+          status={approvalStatus}
+          onAction={(action) => {
+            if (action === "approve") setApprovalStatus("Approved");
+            if (action === "reject") setApprovalStatus("Rejected");
+          }}
+        />
+      </div>
+
+      {/* Case header */}
+      <div className="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-[14px] font-medium truncate font-display">{id}</h1>
+          <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-widest shrink-0 ${
+            caseData.priority === "Critical" ? "border-[color:var(--color-crit)] text-[color:var(--color-crit)]" :
+            caseData.priority === "High" ? "border-[color:var(--color-warn)] text-[color:var(--color-warn)]" :
+            "border-border text-muted-foreground"
+          }`}>{caseData.priority}</span>
+          <span className="text-[10px] text-muted-foreground truncate">{caseData.title}</span>
         </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => {
-              const task = window.prompt("Enter task name to assign:");
-              if (task) window.alert(`Task '${task}' assigned successfully!`);
-            }}
-            className="border border-border bg-background px-3 py-1.5 hover:bg-secondary text-[11px] font-medium uppercase tracking-widest"
-          >
-            Assign Task
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setLeftOpen(o => !o)} className={`p-1 text-muted-foreground hover:text-foreground transition-colors ${leftOpen ? "text-foreground" : ""}`} title="Toggle timeline">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /></svg>
+          </button>
+          <button onClick={() => setRightOpen(o => !o)} className={`p-1 text-muted-foreground hover:text-foreground transition-colors ${rightOpen ? "text-foreground" : ""}`} title="Toggle narratives">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" /></svg>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 flex-1 overflow-hidden">
-        <div className="xl:col-span-2 flex flex-col gap-4 overflow-y-auto pr-2">
-          
-          {/* Top Info row with Gauges */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2 border border-border bg-card p-4">
-              <h2 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Claim Under Investigation</h2>
-              <p className="text-[14px] leading-relaxed font-medium">"{caseData.title}"</p>
+      {/* 3-panel dossier layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left panel — Evidence Timeline */}
+        {leftOpen && (
+          <div className="w-[260px] shrink-0 border-r border-border overflow-y-auto bg-sidebar/50 p-4">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">evidence timeline</div>
+            <div className="space-y-0">
+              {TIMELINE_EVENTS.map((event, i) => (
+                <TimelineNode key={i} event={event} isLast={i === TIMELINE_EVENTS.length - 1} />
+              ))}
             </div>
-            <div className="border border-border bg-card p-4 flex flex-col justify-center gap-3">
-              <ProgressMeter value={82} label="Contradiction Strength" color="var(--color-warn)" />
-              <ProgressMeter value={45} label="Confidence Score" color="var(--color-accent)" />
+          </div>
+        )}
+
+        {/* Center panel — Claim Detail */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-w-0">
+          {/* Claim text */}
+          <div className="border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">claim under investigation</div>
+              <ConfidenceGauge value={45} size={32} />
+            </div>
+            <p className="text-[13px] leading-relaxed font-medium">"{caseData.title}"</p>
+            <div className="mt-3 flex gap-4">
+              <ProgressMeter value={82} label="Contradiction" color="var(--color-warn)" />
+              <ProgressMeter value={45} label="Confidence" color="var(--color-accent)" />
             </div>
           </div>
 
-          {/* Network Graph */}
+          {/* Evidence Network */}
           <div className="border border-border bg-card p-4">
-            <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
-              <h2 className="text-sm font-medium">Evidence Flow Diagram</h2>
-              <span className="text-[10px] uppercase tracking-widest text-accent">Real-time</span>
-            </div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">evidence flow</div>
             <EvidenceNetwork />
           </div>
 
-          {/* Historical Trend */}
+          {/* Risk Trend */}
           <div className="border border-border bg-card p-4">
-            <div className="flex justify-between items-center mb-4 border-b border-border pb-2">
-              <h2 className="text-sm font-medium">Risk & Mentions Trend (7 Days)</h2>
-            </div>
-            <ActivityTimelineChart 
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">risk & mentions (7d)</div>
+            <ActivityTimelineChart
               data={[
                 { date: "Mon", mentions: 120, risk: 45 },
                 { date: "Tue", mentions: 230, risk: 60 },
@@ -115,74 +166,62 @@ function InvestigationDetailPage() {
                 { date: "Thu", mentions: 340, risk: 85 },
                 { date: "Fri", mentions: 450, risk: 95 },
                 { date: "Sat", mentions: 380, risk: 90 },
-                { date: "Sun", mentions: 290, risk: 80 }
+                { date: "Sun", mentions: 290, risk: 80 },
               ]}
               xKey="date"
               yKeys={[
                 { key: "mentions", color: "var(--color-accent)" },
-                { key: "risk", color: "var(--color-warn)" }
+                { key: "risk", color: "var(--color-warn)" },
               ]}
-              height={180}
+              height={160}
             />
           </div>
-          
-          <div className="border border-border bg-card p-4 flex-shrink-0 min-h-[400px] flex flex-col mb-8">
-            <h2 className="text-sm font-medium mb-4 border-b border-border pb-2">Operational Comm-Link</h2>
-            <div className="flex-1 overflow-hidden">
-              <DiscussionThread comments={comments} />
-            </div>
+
+          {/* Discussion Thread */}
+          <div className="border border-border bg-card p-4">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">comm-link</div>
+            <DiscussionThread comments={comments} />
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto">
-          {/* Related Metadata visually improved */}
-          <div className="border border-border bg-card p-4">
-            <h2 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Contextual Network</h2>
-            <div className="flex flex-col gap-3 mb-6">
-              <div className="flex justify-between text-[12px] border-b border-border/50 pb-2">
-                <span className="text-muted-foreground">First Seen:</span>
-                <span className="font-mono">14 Months Ago</span>
-              </div>
-              <div className="flex justify-between text-[12px] border-b border-border/50 pb-2">
-                <span className="text-muted-foreground">Recurrence:</span>
-                <span className="font-mono">High (Peaks every 3 months)</span>
-              </div>
-              <div className="flex justify-between text-[12px]">
-                <span className="text-muted-foreground">Origin Source:</span>
-                <span className="font-mono text-accent cursor-pointer hover:underline">@infrastructure_watch</span>
+        {/* Right panel — Related Narratives */}
+        {rightOpen && (
+          <div className="w-[240px] shrink-0 border-l border-border overflow-y-auto bg-sidebar/50 p-4 space-y-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">related narratives</div>
+              <div className="space-y-2">
+                {RELATED_NARRATIVES.map((n, i) => (
+                  <div key={i} className={`p-2 border-l-2 cursor-pointer hover:bg-secondary/50 transition-colors ${
+                    n.risk === "high" ? "border-l-[color:var(--color-crit)]" :
+                    n.risk === "medium" ? "border-l-[color:var(--color-warn)]" :
+                    "border-l-[color:var(--color-ok)]"
+                  }`}>
+                    <div className="text-[11px] font-medium text-foreground">{n.title}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{n.match}% match</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <h2 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3 mt-6">Entities Detected</h2>
-            <div className="flex flex-wrap gap-2">
-              <span className="px-2 py-1 bg-secondary text-[10px] uppercase tracking-widest border border-border hover:border-[color:var(--color-warn)] text-foreground cursor-pointer transition-colors">Sector 7</span>
-              <span className="px-2 py-1 bg-secondary text-[10px] uppercase tracking-widest border border-border hover:border-accent text-foreground cursor-pointer transition-colors">Infrastructure</span>
-            </div>
-          </div>
-          
-          <div className="border border-border bg-card p-4">
-            <h2 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Narrative Clusters</h2>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1 border-l-2 border-[color:var(--color-warn)] pl-2 hover:bg-secondary/50 cursor-pointer p-1">
-                <span className="text-[12px] font-medium">5G Infrastructure Interference</span>
-                <ProgressMeter value={88} label="Match" color="var(--color-warn)" />
+            <div className="border-t border-border pt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">metadata</div>
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex justify-between"><span className="text-muted-foreground">First seen</span><span>14 months ago</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Recurrence</span><span>High</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Origin</span><span className="text-accent">@infrastructure_watch</span></div>
               </div>
-              <div className="flex flex-col gap-1 border-l-2 border-[color:var(--color-ok)] pl-2 hover:bg-secondary/50 cursor-pointer p-1 mt-2">
-                <span className="text-[12px] font-medium">Local Election Disruption</span>
-                <ProgressMeter value={45} label="Match" color="var(--color-ok)" />
+            </div>
+
+            <div className="border-t border-border pt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">entities</div>
+              <div className="flex flex-wrap gap-1">
+                {["Sector 7", "Infrastructure", "Bot Network"].map(e => (
+                  <span key={e} className="px-1.5 py-0.5 bg-secondary text-[9px] uppercase tracking-widest border border-border">{e}</span>
+                ))}
               </div>
             </div>
           </div>
-          
-          <div className="border border-border bg-card p-4 mt-auto">
-            <h2 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Escalation Path</h2>
-            <HistoricalTimeline 
-              data={[
-                { date: "Automated", value: 10 }, { date: "Tier 1", value: 45 }, { date: "Tier 2", value: 12 }
-              ]}
-            />
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
